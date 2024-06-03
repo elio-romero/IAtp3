@@ -1,0 +1,73 @@
+import numpy as np
+from PIL import Image
+
+def center_of_mass(image):
+  """Calcula el centro de masa de una imagen binaria."""
+  height, width = image.shape
+  y, x = np.ogrid[0:height, 0:width]
+  center_x = np.sum(x * image) / np.sum(image)
+  center_y = np.sum(y * image) / np.sum(image)
+  return center_y, center_x
+
+class HopfieldNetwork:
+  def __init__(self, size):
+    self.size = size
+    self.weights = np.zeros((size, size))
+
+  def train_hebb(self, patterns):
+    """Entrena la red en una lista de patrones binarios usando la regla de Hebb."""
+    for pattern in patterns:
+      self.weights += np.outer(pattern, pattern)
+
+  def train_pseudoinverse(self, patterns):
+    """Entrena la red en una lista de patrones binarios usando pseudoinverso."""
+    patterns = np.array(patterns)
+    self.weights = np.linalg.pinv(patterns) @ patterns.T
+
+  def recall(self, probe):
+    """Recupera un patrón de la red mediante actualización asincrónica."""
+    updated_probe = probe.copy()
+    for _ in range(self.size):
+      for i in range(self.size):
+        field = np.sum(self.weights[i] * updated_probe)
+        updated_probe[i] = np.sign(field)
+    return updated_probe
+
+def preprocess_image(image_path):
+  """Carga una imagen png, la convierte a binaria y la aplana."""
+  image = Image.open(image_path).convert('L').resize((10, 10))
+  bw_threshold = 128  # Ajuste según los datos de la imagen
+  image = np.where(np.array(image) > bw_threshold, 1, 0)
+  return image.flatten()
+
+def main():
+  # Definir rutas de imágenes
+  image_path_1 = "./IAtp3train.png"
+  image_path_2 = "./IAtp3train_2.png"
+
+  # Cargar y preprocesar imágenes
+  image_data_1 = preprocess_image(image_path_1)
+  image_data_2 = preprocess_image(image_path_2)
+
+  # Crea la red
+  network = HopfieldNetwork(100)
+
+  # Métodos de entrenamiento (elegir uno)
+  network.train_hebb([image_data_1, image_data_2])  # regla de hebb
+  #network.train_pseudoinverse([image_data_1, image_data_2])  # Pseudoinverse
+
+  # Imagen de entrada
+  input_image_path = "./IAtp3test.png"
+  input_image = preprocess_image(input_image_path)
+
+  # Ejecutar recuperación y encontrar centro
+  recalled_image = network.recall(input_image).reshape(10, 10)
+  center_y, center_x = center_of_mass(recalled_image)
+
+  # Imprime resultados
+  print("Imagen Recuperada:")
+  print(recalled_image)
+  print("Centro de Masa:", (center_y, center_x))
+
+if __name__ == "__main__":
+  main()
